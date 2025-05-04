@@ -2,11 +2,11 @@ import os
 import requests
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
+from lib_version import get_version
 
 # If you're using version-util, import it here
 # from version_util import VersionUtil
 
-# Load environment variables from .env file if present
 load_dotenv()
 
 app = Flask(__name__)
@@ -16,9 +16,9 @@ PORT = int(os.environ.get("PORT", 3000))
 MODEL_SERVICE_URL = os.environ.get("MODEL_SERVICE_URL", "http://localhost:5000")
 
 # If you're using version-util
-# version_util = VersionUtil()
-# APP_VERSION = version_util.get_version()
-APP_VERSION = "1.0.0"  # Default version if not using version-util
+# TODO: version_util = VersionUtil()
+# TODO: APP_VERSION = version_util.get_version()
+APP_VERSION = get_version()
 
 @app.route("/")
 def index():
