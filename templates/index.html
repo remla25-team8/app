@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Review Sentiment Analysis</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Restaurant Review Sentiment Analysis</h1>
+        <p>App version: <span id="app-version">{{ app_version }}</span></p>
+        <p>Model service status: <span id="model-status">Checking...</span></p>
+      </header>
+
+      <main>
+        <div class="review-form">
+          <h2>Enter your review:</h2>
+          <textarea
+            id="review-text"
+            placeholder="Type your restaurant review here..."
+          ></textarea>
+          <button id="analyze-btn">Analyze Sentiment</button>
+        </div>
+
+        <div class="results" id="results-container" style="display: none">
+          <h2>Analysis Results</h2>
+          <div class="sentiment-result">
+            <div id="sentiment-icon" class="sentiment-icon"></div>
+            <p id="sentiment-text">
+              The sentiment analysis result will appear here.
+            </p>
+          </div>
+
+          <div class="feedback-section">
+            <h3>Is this prediction correct?</h3>
+            <div class="feedback-buttons">
+              <button id="correct-btn">Yes, it's correct!</button>
+              <button id="incorrect-btn">No, it's wrong</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>REMLA Restaurant Sentiment Analysis Demo - Team 8</p>
+      </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>
