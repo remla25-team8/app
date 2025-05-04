@@ -2,12 +2,8 @@ name: Build and Release Docker Image
 
 on:
   push:
-    branches:
-      - main
-      - app
     tags:
       - "v*.*.*"
-  # This allows for manual trigger
   workflow_dispatch:
 
 jobs:

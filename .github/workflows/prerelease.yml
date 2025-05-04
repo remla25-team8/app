@@ -2,9 +2,6 @@ name: Create Pre-release Version
 
 on:
   push:
-    branches:
-      - main
-      - app
     tags:
       - "v*.*.*"
     tags-ignore:
