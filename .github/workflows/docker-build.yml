@@ -1,4 +1,4 @@
-name: Build and release Docker Image
+name: Build and Release Docker Image
 
 on:
   push:
@@ -45,3 +45,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          name: Release ${{ github.ref_name }}
+          body: |
+            # Release ${{ github.ref_name }}
+
+            ## Docker Images
+
+            - `ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
+            - `ghcr.io/${{ github.repository }}:latest`
+
+            ## Usage
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
