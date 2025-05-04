@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   checkModelStatus();
 
-  // These are someevent listeners
+  // These are some event listeners
   analyzeBtn.addEventListener("click", analyzeSentiment);
   correctBtn.addEventListener("click", () => submitFeedback(true));
   incorrectBtn.addEventListener("click", () => submitFeedback(false));
