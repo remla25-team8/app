@@ -43,7 +43,7 @@ jobs:
           # Here we generate timestamp to make pre-release unique
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
-          # Thiss will create pre-release version
+          # This will create pre-release version
           NEXT_PRE_VERSION="v$MAJOR.$MINOR.$NEXT_PATCH-pre.$TIMESTAMP"
           echo "Next pre-release version: $NEXT_PRE_VERSION"
           echo "NEXT_VERSION=$NEXT_PRE_VERSION" >> $GITHUB_ENV
