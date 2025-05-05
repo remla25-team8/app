@@ -2,39 +2,55 @@ import os
 import requests
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
-from lib_version import get_version
+from lib_version import VersionUtil
 
-# If you're using version-util, import it here
-# from version_util import VersionUtil
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration
-PORT = int(os.environ.get("PORT", 3000))
-MODEL_SERVICE_URL = os.environ.get("MODEL_SERVICE_URL", "http://localhost:5000")
 
-# If you're using version-util
-# TODO: version_util = VersionUtil()
-# TODO: APP_VERSION = version_util.get_version()
-APP_VERSION = get_version()
+import logging
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG if app.config['DEBUG'] else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Configuration
+PORT = int(os.environ.get("PORT", 8080))
+MODEL_SERVICE_URL = os.environ.get("MODEL_SERVICE_URL", "http://0.0.0.0:5000")
+APP_VERSION = os.environ.get("APP_VERSION", "0.0.0")
+MODEL_SERVICE_VERSION = os.environ.get("MODEL_SERVICE_VERSION", "0.0.0")
+
+LIB_VERSION = VersionUtil.get_version()
 
 @app.route("/")
 def index():
+
+
     """Display the main application page."""
-    return render_template("index.html", app_version=APP_VERSION)
+    return render_template("index.html", 
+        app_version=APP_VERSION,
+        lib_version=LIB_VERSION,
+        model_service_version=MODEL_SERVICE_VERSION,
+        
+        
+    )
 
 @app.route("/info")
 def info():
     """Get version information."""
     # Get model service info
     try:
-        model_info = requests.get(f"{MODEL_SERVICE_URL}/info", timeout=5).json()
+        model_info = requests.get(f"{MODEL_SERVICE_URL}/health", timeout=5).json()
     except requests.RequestException:
         model_info = {"error": "Could not connect to model service"}
     
     return jsonify({
+        "lib_version": LIB_VERSION,
+        "model_service_version": MODEL_SERVICE_VERSION,
         "app_version": APP_VERSION,
         "model_service_url": MODEL_SERVICE_URL,
         "model_service_info": model_info
@@ -51,6 +67,7 @@ def analyze():
     }
     """
     data = request.get_json()
+    print(f"Received data: {data}")
     
     if not data or "review" not in data:
         return jsonify({
@@ -103,4 +120,4 @@ def feedback():
     }), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    app.run(host="0.0.0.0", port=PORT, debug=True)

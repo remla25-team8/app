@@ -55,9 +55,24 @@ document.addEventListener("DOMContentLoaded", function () {
         review: reviewText.value,
       }),
     })
-      .then((response) => response.json())
+      // .then((response) => response.json())
+      .then((response) => {
+        console.log("DEBUG: Response status:", response.status);
+        // Log the raw response text before parsing
+        return response.text().then((text) => {
+          console.log("DEBUG: Raw response text:", text);
+          try {
+            const data = JSON.parse(text);
+            return data;
+          } catch (e) {
+            console.error("DEBUG: JSON parse error:", e);
+            throw e;
+          }
+        });
+      })
       .then((data) => {
         currentReviewData = data;
+        console.log("Received data:", data);
 
         resultsContainer.style.display = "block";
 
