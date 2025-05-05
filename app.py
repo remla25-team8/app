@@ -67,7 +67,7 @@ def analyze():
     }
     """
     data = request.get_json()
-    print(f"Received data: {data}")
+    logger.debug(f"Received data: {data}")
     
     if not data or "review" not in data:
         return jsonify({
