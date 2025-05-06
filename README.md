@@ -21,9 +21,15 @@ This repository contains a web application for analyzing restaurant reviews to d
 - **Dockerized Environment:** The application is containerized using Docker with multi-stage builds and released as a package in GitHub Container Registry (ghcr.io).
 
 - **Automated Release Process:** GitHub Actions workflows handle:
+
   - Building and publishing Docker images with proper versioning
   - Creating GitHub releases and pre-releases automatically
   - Supporting multiple architectures (amd64, arm64)
+
+- **OpenAPI Documentation:** All API endpoints are documented using Flasgger/Swagger:
+  - Interactive API documentation available at `/api/docs`
+  - Fully compliant with [Open API Specification](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/2.0.md#operation-object)
+  - Test API endpoints directly from the documentation interface
 
 ## API Endpoints (app-service)
 
@@ -33,6 +39,7 @@ This repository contains a web application for analyzing restaurant reviews to d
 | `/info`     | GET    | Get version information for app and model service |
 | `/analyze`  | POST   | Submit a review for sentiment analysis            |
 | `/feedback` | POST   | Submit feedback for incorrect predictions         |
+| `/api/docs` | GET    | Interactive API documentation (Swagger UI)        |
 
 ### Analyze Endpoint
 
