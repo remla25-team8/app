@@ -7,6 +7,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
+# Add build arg for requirements hash to invalidate cache when requirements change
+ARG REQ_HASH
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 

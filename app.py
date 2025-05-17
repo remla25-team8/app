@@ -5,6 +5,8 @@ from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from lib_version import VersionUtil
 from flasgger import Swagger
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter, Gauge, Histogram
 
 load_dotenv()
 
@@ -24,6 +26,35 @@ APP_VERSION = os.environ.get("APP_VERSION", "0.0.0")
 MODEL_SERVICE_VERSION = os.environ.get("MODEL_SERVICE_VERSION", "0.0.0")
 
 LIB_VERSION = VersionUtil.get_version()
+
+# Configure Prometheus metrics
+metrics = PrometheusMetrics(app, path='/metrics')
+metrics.info('app_info', 'Application info', version=APP_VERSION)
+
+# Define custom metrics
+sentiment_analysis_requests = Counter(
+    'sentiment_analysis_total', 
+    'Number of sentiment analysis requests',
+    ['sentiment']  # Label to track positive vs negative predictions
+)
+
+model_response_time = Histogram(
+    'model_response_time_seconds', 
+    'Model service response time in seconds',
+    buckets=[0.01, 0.05, 0.1, 0.5, 1, 2, 5]  # Buckets in seconds
+)
+
+active_users = Gauge(
+    'active_users', 
+    'Number of active users on the application',
+    ['page']  # Label to track which page users are on
+)
+
+feedback_counter = Counter(
+    'user_feedback_total', 
+    'Number of feedback submissions',
+    ['correct', 'predicted_sentiment', 'actual_sentiment']  # Labels for tracking feedback types
+)
 
 # Configure Swagger
 swagger_config = {
@@ -52,6 +83,7 @@ swagger = Swagger(app, config=swagger_config, template={
 @app.route("/")
 def index():
     """Display the main application page."""
+    active_users.labels(page='index').inc()
     return render_template("index.html", 
         app_version=APP_VERSION,
         lib_version=LIB_VERSION,
@@ -88,6 +120,7 @@ def info():
               description: Information about the model service
     """
     # Get model service info
+    active_users.labels(page='info').inc()
     try:
         model_info = requests.get(f"{MODEL_SERVICE_URL}/health", timeout=5).json()
     except requests.RequestException:
@@ -152,6 +185,7 @@ def analyze():
     """
     data = request.get_json()
     logger.debug(f"Received data: {data}")
+    active_users.labels(page='analyze').inc()
     
     if not data or "review" not in data:
         return jsonify({
@@ -162,14 +196,17 @@ def analyze():
     
     # Call model service
     try:
-        response = requests.post(
-            f"{MODEL_SERVICE_URL}/predict",
-            json={"review": review},
-            timeout=5
-        )
+        with model_response_time.time():
+            response = requests.post(
+                f"{MODEL_SERVICE_URL}/predict",
+                json={"review": review},
+                timeout=5
+            )
         
         if response.status_code == 200:
             result = response.json()
+            sentiment = 'positive' if result.get('prediction', 0) == 1 else 'negative'
+            sentiment_analysis_requests.labels(sentiment=sentiment).inc()
             return jsonify(result), 200
         else:
             return jsonify({
@@ -225,6 +262,23 @@ def feedback():
     # In a real app, you would store this feedback for model improvement
     # For this demo, we'll just log it
     print(f"Feedback received: {data}")
+    active_users.labels(page='feedback').inc()
+    
+    # Track feedback metrics
+    review = data.get("review", "")
+    prediction = data.get("prediction", -1)
+    actual_sentiment = data.get("actual_sentiment", -1)
+    
+    # Determine if prediction was correct
+    correct = "true" if prediction == actual_sentiment else "false"
+    predicted_sentiment = "positive" if prediction == 1 else "negative"
+    actual = "positive" if actual_sentiment == 1 else "negative"
+    
+    feedback_counter.labels(
+        correct=correct,
+        predicted_sentiment=predicted_sentiment,
+        actual_sentiment=actual
+    ).inc()
     
     return jsonify({
         "status": "success",
@@ -232,4 +286,4 @@ def feedback():
     }), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=True)
+    app.run(host="0.0.0.0", port=PORT)
