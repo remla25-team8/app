@@ -153,6 +153,10 @@ def analyze():
             review:
               type: string
               example: "The restaurant was fantastic!"
+      - name: x-user-id
+        in: header
+        type: string
+        description: User ID for session consistency
     responses:
       200:
         description: Sentiment analysis result
@@ -179,27 +183,27 @@ def analyze():
         description: Server error
         schema:
           type: object
-          properties:
-            error:
-              type: string
     """
+    user_id = request.headers.get('x-user-id', 'unknown')
+    logger.debug(f"Received request with x-user-id: {user_id}")
     data = request.get_json()
     logger.debug(f"Received data: {data}")
     active_users.labels(page='analyze').inc()
     
     if not data or "review" not in data:
         return jsonify({
-            "error": "Missing 'review' field in request"
+            'error': "Missing 'review' field in request"
         }), 400
     
     review = data["review"]
     
-    # Call model service
+    # Call model service with x-user-id header
     try:
         with model_response_time.time():
             response = requests.post(
                 f"{MODEL_SERVICE_URL}/predict",
-                json={"review": review},
+                json={'data': {'review': review}},
+                headers={'x-user-id': user_id},
                 timeout=5
             )
         
@@ -210,12 +214,12 @@ def analyze():
             return jsonify(result), 200
         else:
             return jsonify({
-                "error": f"Model service returned error: {response.text}"
+                'error': f"Model service returned error: {response.text}"
             }), 500
     
     except requests.RequestException as e:
         return jsonify({
-            "error": f"Could not connect to model service: {str(e)}"
+            'error': f"Failed to connect to model service: {str(e)}"
         }), 500
 
 @app.route("/feedback", methods=["POST"])
