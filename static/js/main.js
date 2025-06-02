@@ -1,134 +1,164 @@
 document.addEventListener("DOMContentLoaded", function () {
+  // Elements
   const reviewText = document.getElementById("review-text");
   const analyzeBtn = document.getElementById("analyze-btn");
+  const clearBtn = document.getElementById("clear-btn");
   const resultsContainer = document.getElementById("results-container");
   const sentimentIcon = document.getElementById("sentiment-icon");
   const sentimentText = document.getElementById("sentiment-text");
+  const confidenceText = document.getElementById("confidence-text");
   const correctBtn = document.getElementById("correct-btn");
   const incorrectBtn = document.getElementById("incorrect-btn");
   const modelStatus = document.getElementById("model-status");
+  const charCount = document.getElementById("char-count");
 
-  checkModelStatus();
+  const MAX_CHARS = 500;
+  let currentToast = null;
 
-  // These are some event listeners
-  analyzeBtn.addEventListener("click", analyzeSentiment);
-  correctBtn.addEventListener("click", () => submitFeedback(true));
-  incorrectBtn.addEventListener("click", () => submitFeedback(false));
+  // Character counter
+  reviewText.addEventListener("input", function () {
+    const length = this.value.length;
+    charCount.textContent = length;
+    
+    if (length > MAX_CHARS) {
+      this.value = this.value.substring(0, MAX_CHARS);
+      charCount.textContent = MAX_CHARS;
+      showToast("warning", "Maximum character limit reached");
+    }
+  });
 
-  let currentReviewData = null;
+  // Clear button
+  clearBtn.addEventListener("click", function () {
+    reviewText.value = "";
+    charCount.textContent = "0";
+    resultsContainer.style.display = "none";
+  });
 
   // Check model service status
-  function checkModelStatus() {
-    fetch("/info")
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.model_service_info && !data.model_service_info.error) {
-          modelStatus.textContent = "Connected";
-          modelStatus.classList.add("connected");
-        } else {
-          modelStatus.textContent = "Disconnected";
-          modelStatus.classList.add("disconnected");
-        }
-      })
-      .catch((error) => {
-        console.error("Error checking model status:", error);
-        modelStatus.textContent = "Disconnected";
+  async function checkModelService() {
+    try {
+      const response = await fetch("/info");
+      const data = await response.json();
+      
+      if (data.model_service_status === "connected") {
+        modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Connected</span>';
+        modelStatus.classList.add("connected");
+        modelStatus.classList.remove("disconnected");
+      } else {
+        modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Disconnected</span>';
         modelStatus.classList.add("disconnected");
-      });
+        modelStatus.classList.remove("connected");
+      }
+    } catch (error) {
+      modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Error</span>';
+      modelStatus.classList.add("disconnected");
+      modelStatus.classList.remove("connected");
+    }
   }
 
-  function analyzeSentiment() {
-    if (!reviewText.value.trim()) {
-      alert("Please enter a review to analyze");
+  // Toast notification system
+  function showToast(type, message) {
+    if (currentToast) {
+      currentToast.remove();
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    
+    let icon;
+    switch (type) {
+      case "success":
+        icon = "check-circle";
+        break;
+      case "error":
+        icon = "times-circle";
+        break;
+      case "warning":
+        icon = "exclamation-circle";
+        break;
+      default:
+        icon = "info-circle";
+    }
+
+    toast.innerHTML = `
+      <i class="fas fa-${icon}"></i>
+      <span>${message}</span>
+    `;
+
+    document.body.appendChild(toast);
+    currentToast = toast;
+
+    // Trigger reflow to enable transition
+    toast.offsetHeight;
+    toast.classList.add("visible");
+
+    setTimeout(() => {
+      toast.classList.remove("visible");
+      setTimeout(() => toast.remove(), 300);
+      currentToast = null;
+    }, 3000);
+  }
+
+  // Analyze sentiment
+  analyzeBtn.addEventListener("click", async function () {
+    const review = reviewText.value.trim();
+    
+    if (!review) {
+      showToast("warning", "Please enter a review first");
       return;
     }
 
-    analyzeBtn.textContent = "Analyzing...";
-    analyzeBtn.disabled = true;
-
-    fetch("/analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        review: reviewText.value,
-      }),
-    })
-      // .then((response) => response.json())
-      .then((response) => {
-        console.log("DEBUG: Response status:", response.status);
-        // Log the raw response text before parsing
-        return response.text().then((text) => {
-          console.log("DEBUG: Raw response text:", text);
-          try {
-            const data = JSON.parse(text);
-            return data;
-          } catch (e) {
-            console.error("DEBUG: JSON parse error:", e);
-            throw e;
-          }
-        });
-      })
-      .then((data) => {
-        currentReviewData = data;
-        console.log("Received data:", data);
-
-        resultsContainer.style.display = "block";
-
-        if (data.sentiment === "positive") {
-          sentimentIcon.className = "sentiment-icon positive-sentiment";
-          sentimentText.textContent = "This review appears to be Positive!";
-        } else {
-          sentimentIcon.className = "sentiment-icon negative-sentiment";
-          sentimentText.textContent = "This review appears to be Negative.";
-        }
-
-        analyzeBtn.textContent = "Analyze Sentiment";
-        analyzeBtn.disabled = false;
-      })
-      .catch((error) => {
-        console.error("Error analyzing sentiment:", error);
-        alert(
-          "An error occurred while analyzing the review. Please try again later."
-        );
-
-        analyzeBtn.textContent = "Analyze Sentiment";
-        analyzeBtn.disabled = false;
-      });
-  }
-
-  function submitFeedback(isCorrect) {
-    if (!currentReviewData) {
-      return;
-    }
-
-    if (isCorrect) {
-      alert("Thank you for your feedback!");
-    } else {
-      const actualSentiment = currentReviewData.prediction === 1 ? 0 : 1;
-
-      fetch("/feedback", {
+    try {
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Analyzing...</span>';
+      
+      const response = await fetch("/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          review: currentReviewData.review,
-          prediction: currentReviewData.prediction,
-          actual_sentiment: actualSentiment,
-        }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          alert(
-            "Thank you for your feedback! We will use it to improve our model."
-          );
-        })
-        .catch((error) => {
-          console.error("Error submitting feedback:", error);
-          alert("An error occurred while submitting your feedback.");
-        });
+        body: JSON.stringify({ review }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze review");
+      }
+
+      const data = await response.json();
+      
+      // Update UI with results
+      resultsContainer.style.display = "block";
+      
+      sentimentIcon.innerHTML = data.sentiment === "positive" 
+        ? '<i class="fas fa-smile"></i>'
+        : '<i class="fas fa-frown"></i>';
+      sentimentIcon.className = `sentiment-icon ${data.sentiment}`;
+      
+      sentimentText.textContent = `Sentiment: ${data.sentiment}`;
+      confidenceText.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+      
+      showToast("success", "Analysis complete!");
+    } catch (error) {
+      showToast("error", "Failed to analyze review. Please try again.");
+      console.error("Analysis error:", error);
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = '<i class="fas fa-magic"></i><span>Analyze Sentiment</span>';
     }
-  }
-});
+  });
+
+  // Feedback handling
+  correctBtn.addEventListener("click", function() {
+    showToast("success", "Thank you for your feedback!");
+  });
+
+  incorrectBtn.addEventListener("click", function() {
+    showToast("info", "Thank you for helping us improve!");
+  });
+
+  // Initial model service check
+  checkModelService();
+  
+  // Periodic status check
+  setInterval(checkModelService, 30000);
+}); 

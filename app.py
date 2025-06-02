@@ -117,16 +117,6 @@ def index():
         model_service_version=MODEL_SERVICE_VERSION,
     )
 
-@app.route("/v2")
-def index_v2():
-    """Display the v2 (modern) application page."""
-    active_users.labels(page='index_v2').inc()
-    return render_template("index_v2.html", 
-        app_version=APP_VERSION,
-        lib_version=LIB_VERSION,
-        model_service_version=MODEL_SERVICE_VERSION,
-    )
-
 @app.route("/info")
 def info():
     """
