@@ -1,7 +1,9 @@
 import os
 import requests
 import logging
-from flask import Flask, render_template, request, jsonify
+import time
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 from lib_version import VersionUtil
 from flasgger import Swagger
@@ -11,6 +13,7 @@ from prometheus_client import Counter, Gauge, Histogram
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # Required for session management
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +39,13 @@ sentiment_analysis_requests = Counter(
     'sentiment_analysis_total', 
     'Number of sentiment analysis requests',
     ['sentiment']  # Label to track positive vs negative predictions
+)
+
+session_duration = Histogram(
+    'session_duration_seconds',
+    'Duration of user sessions in seconds',
+    ['version'],
+    buckets=[10, 60, 120, 300, 600, 1800, 3600]  # 10s to 1h
 )
 
 model_response_time = Histogram(
@@ -79,6 +89,23 @@ swagger = Swagger(app, config=swagger_config, template={
         "version": APP_VERSION,
     }
 })
+
+@app.before_request
+def before_request():
+    """Track session start time and update active users."""
+    if 'session_start' not in session:
+        session['session_start'] = time.time()
+        # Add 'general' as default page label
+        active_users.labels(page='general').inc()
+
+@app.teardown_request
+def teardown_request(exception=None):
+    """Record session duration when session ends."""
+    if 'session_start' in session:
+        duration = time.time() - session['session_start']
+        # Only record sessions that are longer than 1 second to filter out bots/crawlers
+        if duration > 1:
+            session_duration.labels(version=APP_VERSION).observe(duration)
 
 @app.route("/")
 def index():
