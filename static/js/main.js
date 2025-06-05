@@ -41,16 +41,16 @@ document.addEventListener("DOMContentLoaded", function () {
       const data = await response.json();
       
       if (data.model_service_status === "connected") {
-        modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Connected</span>';
+        modelStatus.innerHTML = '<span class="icon">🟢</span><span>Connected</span>';
         modelStatus.classList.add("connected");
         modelStatus.classList.remove("disconnected");
       } else {
-        modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Disconnected</span>';
+        modelStatus.innerHTML = '<span class="icon">🔴</span><span>Disconnected</span>';
         modelStatus.classList.add("disconnected");
         modelStatus.classList.remove("connected");
       }
     } catch (error) {
-      modelStatus.innerHTML = '<i class="fas fa-circle"></i><span>Error</span>';
+      modelStatus.innerHTML = '<span class="icon">⚠️</span><span>Error</span>';
       modelStatus.classList.add("disconnected");
       modelStatus.classList.remove("connected");
     }
@@ -68,20 +68,20 @@ document.addEventListener("DOMContentLoaded", function () {
     let icon;
     switch (type) {
       case "success":
-        icon = "check-circle";
+        icon = "✅";
         break;
       case "error":
-        icon = "times-circle";
+        icon = "❌";
         break;
       case "warning":
-        icon = "exclamation-circle";
+        icon = "⚠️";
         break;
       default:
-        icon = "info-circle";
+        icon = "ℹ️";
     }
 
     toast.innerHTML = `
-      <i class="fas fa-${icon}"></i>
+      <span class="icon">${icon}</span>
       <span>${message}</span>
     `;
 
@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
       analyzeBtn.disabled = true;
-      analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Analyzing...</span>';
+      analyzeBtn.innerHTML = '<span class="icon">⏳</span><span>Analyzing...</span>';
       
       const response = await fetch("/analyze", {
         method: "POST",
@@ -130,8 +130,8 @@ document.addEventListener("DOMContentLoaded", function () {
       resultsContainer.style.display = "block";
       
       sentimentIcon.innerHTML = data.sentiment === "positive" 
-        ? '<i class="fas fa-smile"></i>'
-        : '<i class="fas fa-frown"></i>';
+        ? '<span class="icon">😊</span>'
+        : '<span class="icon">😞</span>';
       sentimentIcon.className = `sentiment-icon ${data.sentiment}`;
       
       sentimentText.textContent = `Sentiment: ${data.sentiment}`;
@@ -143,7 +143,7 @@ document.addEventListener("DOMContentLoaded", function () {
       console.error("Analysis error:", error);
     } finally {
       analyzeBtn.disabled = false;
-      analyzeBtn.innerHTML = '<i class="fas fa-magic"></i><span>Analyze Sentiment</span>';
+      analyzeBtn.innerHTML = '<span class="icon">✨</span><span>Analyze Sentiment</span>';
     }
   });
 
