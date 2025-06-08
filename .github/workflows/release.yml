@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
-      - "v*.*.*-pre*"
+      - "v*.*.*-pre-*"
   workflow_dispatch:
 
 jobs:
@@ -67,8 +67,8 @@ jobs:
             MODEL_SERVICE_VERSION=${{ steps.version.outputs.version }}
             REQ_HASH=${{ steps.req_hash.outputs.hash }}
           tags: |
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest
             ghcr.io/${{ steps.lowercase.outputs.owner }}/app:${{ steps.version.outputs.version }}
+            ${{ !contains(github.ref_name, '-pre-') && 'ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest' || 'ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest-pre' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha

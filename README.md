@@ -87,11 +87,20 @@ This repository contains a web application for analyzing restaurant reviews to d
 ### Using Docker (Recommended)
 
 ```bash
-# Pull the latest image
+# Pull the latest stable release
 docker pull ghcr.io/remla25-team8/app:latest
 
-# Run the container
+# Pull the latest pre-release
+docker pull ghcr.io/remla25-team8/app:latest-pre
+
+# Pull a specific pre-release version
+docker pull ghcr.io/remla25-team8/app:v1.0.1-pre-2
+
+# Run the container (using stable release)
 docker run -p 8080:8080 -e MODEL_SERVICE_URL=http://model-service:5000 ghcr.io/remla25-team8/app:latest
+
+# Run the container (using latest pre-release)
+docker run -p 8080:8080 -e MODEL_SERVICE_URL=http://model-service:5000 ghcr.io/remla25-team8/app:latest-pre
 ```
 
 ### Manual Installation
@@ -156,9 +165,16 @@ app/
 
 This repository uses GitHub Actions for automated versioning and image building:
 
-1. When a version tag is pushed (e.g., `v1.0.0`), the Docker image is automatically built and published
-2. After a stable release, a pre-release tag for the next version is automatically created
-3. Images are built for multiple architectures (amd64 and arm64)
+1. **Stable Releases**: When a stable version tag is pushed (e.g., `v1.0.0`), the Docker image is automatically built and published with `latest` tag
+2. **Automatic Pre-releases**: After a stable release, a pre-release tag for the next version is automatically created (e.g., `v1.0.1-pre-1`)
+3. **Manual Pre-releases**: Additional pre-release iterations can be created manually via GitHub Actions workflow dispatch:
+   - Navigate to Actions → "Manual Pre-release Creation" 
+   - Specify base version (e.g., `1.0.1`) and optional description
+   - System automatically creates incremental versions (`v1.0.1-pre-2`, `v1.0.1-pre-3`, etc.)
+4. **Multi-architecture Support**: Images are built for multiple architectures (amd64 and arm64)
+5. **Pre-release Tagging**: Pre-release images are tagged with both specific version and `latest-pre` for easy access
+
+For detailed information about the pre-release workflow, see [PRERELEASE_WORKFLOW.md](./PRERELEASE_WORKFLOW.md).
 
 ## Use of Generative AI
 
