@@ -28,6 +28,27 @@ jobs:
         run: |
           echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
+      - name: Determine Docker tags
+        id: docker-tags
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          OWNER="${{ steps.lowercase.outputs.owner }}"
+          
+          # Base tags
+          TAGS="ghcr.io/$OWNER/app:$VERSION"
+          
+          # Add appropriate latest tag based on whether it's a pre-release
+          if [[ "${{ github.ref_name }}" == *"-pre-"* ]]; then
+            TAGS="$TAGS,ghcr.io/$OWNER/app:latest-pre"
+            echo "Pre-release detected, using latest-pre tag"
+          else
+            TAGS="$TAGS,ghcr.io/$OWNER/app:latest"
+            echo "Stable release detected, using latest tag"
+          fi
+          
+          echo "Final tags: $TAGS"
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -66,9 +87,7 @@ jobs:
             APP_VERSION=${{ steps.version.outputs.version }}
             MODEL_SERVICE_VERSION=${{ steps.version.outputs.version }}
             REQ_HASH=${{ steps.req_hash.outputs.hash }}
-          tags: |
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/app:${{ steps.version.outputs.version }}
-            ${{ !contains(github.ref_name, '-pre-') && 'ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest' || 'ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest-pre' }}
+          tags: ${{ steps.docker-tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
@@ -88,7 +107,7 @@ jobs:
             ## Docker Images
 
             - `ghcr.io/${{ steps.lowercase.outputs.owner }}/app:${{ steps.version.outputs.version }}`
-            - `ghcr.io/${{ steps.lowercase.outputs.owner }}/app:latest`
+            - `ghcr.io/${{ steps.lowercase.outputs.owner }}/app:${{ contains(github.ref_name, '-pre-') && 'latest-pre' || 'latest' }}`
             
             Platforms supported:
             - linux/amd64
