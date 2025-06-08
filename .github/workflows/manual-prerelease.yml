@@ -1,20 +1,24 @@
-name: Create Pre-release Version
+name: Manual Pre-release Creation
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-      - "!v*.*.*-pre*"
   workflow_dispatch:
     inputs:
       base_version:
-        description: 'Base version for pre-release (e.g., 1.2.3)'
+        description: 'Base version for pre-release (e.g., 1.2.3 - without v prefix)'
         required: true
         type: string
+      description:
+        description: 'Description of changes in this pre-release'
+        required: false
+        type: string
+        default: 'Manual pre-release iteration'
 
 jobs:
-  create-prerelease:
+  create-manual-prerelease:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # For creating releases and tags
+      packages: write # For pushing to GHCR
 
     steps:
       - name: Checkout code
@@ -28,42 +32,30 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Determine base version
-        id: base-version
+      - name: Validate version format
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual trigger with specified version
-            BASE_VERSION="${{ github.event.inputs.base_version }}"
-            echo "Base version from input: $BASE_VERSION"
-          else
-            # Triggered by stable release tag
-            CURRENT_TAG=${GITHUB_REF#refs/tags/}
-            echo "Current tag: $CURRENT_TAG"
-            VERSION=${CURRENT_TAG#v}
-            
-            # Split into components and increment patch version
-            IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
-            MAJOR="${VERSION_PARTS[0]}"
-            MINOR="${VERSION_PARTS[1]}"
-            PATCH="${VERSION_PARTS[2]}"
-            
-            NEXT_PATCH=$((PATCH + 1))
-            BASE_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
-            echo "Calculated base version: $BASE_VERSION"
+          BASE_VERSION="${{ github.event.inputs.base_version }}"
+          if [[ ! "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $BASE_VERSION"
+            echo "Please use format: x.y.z (e.g., 1.2.3)"
+            exit 1
           fi
-          
-          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Version format is valid: $BASE_VERSION"
 
       - name: Find next pre-release iteration
         id: next-iteration
         run: |
-          BASE_VERSION="${{ steps.base-version.outputs.BASE_VERSION }}"
+          BASE_VERSION="${{ github.event.inputs.base_version }}"
           echo "Looking for existing pre-release tags for version $BASE_VERSION"
           
           # Get all existing pre-release tags for this base version
           EXISTING_TAGS=$(git tag -l "v$BASE_VERSION-pre-*" | sort -V)
           echo "Existing pre-release tags:"
-          echo "$EXISTING_TAGS"
+          if [ -n "$EXISTING_TAGS" ]; then
+            echo "$EXISTING_TAGS"
+          else
+            echo "None found"
+          fi
           
           # Find the highest iteration number
           HIGHEST_ITERATION=0
@@ -87,16 +79,18 @@ jobs:
           
           echo "NEXT_VERSION=$NEXT_PRE_VERSION" >> $GITHUB_OUTPUT
           echo "ITERATION_NUMBER=$NEXT_ITERATION" >> $GITHUB_OUTPUT
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Create pre-release tag
         run: |
           NEXT_VERSION="${{ steps.next-iteration.outputs.NEXT_VERSION }}"
+          DESCRIPTION="${{ github.event.inputs.description }}"
+          
           echo "Creating tag: $NEXT_VERSION"
           
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COMMIT_MESSAGE="Manual pre-release $NEXT_VERSION"
-          else
-            COMMIT_MESSAGE="Automatic pre-release $NEXT_VERSION after ${{ github.ref_name }}"
+          COMMIT_MESSAGE="Manual pre-release $NEXT_VERSION"
+          if [ -n "$DESCRIPTION" ]; then
+            COMMIT_MESSAGE="$COMMIT_MESSAGE - $DESCRIPTION"
           fi
           
           git tag -a "$NEXT_VERSION" -m "$COMMIT_MESSAGE"
@@ -113,10 +107,15 @@ jobs:
           body: |
             # Pre-release ${{ steps.next-iteration.outputs.NEXT_VERSION }}
             
-            ${{ github.event_name == 'workflow_dispatch' && 'This is a manual pre-release created via workflow dispatch.' || format('This is an automatic pre-release following the stable release {0}.', github.ref_name) }}
+            🚀 This is a **manual pre-release** created via workflow dispatch.
             
-            **Base Version:** ${{ steps.base-version.outputs.BASE_VERSION }}  
-            **Iteration:** #${{ steps.next-iteration.outputs.ITERATION_NUMBER }}
+            **Base Version:** ${{ steps.next-iteration.outputs.BASE_VERSION }}  
+            **Iteration:** #${{ steps.next-iteration.outputs.ITERATION_NUMBER }}  
+            **Created by:** @${{ github.actor }}
+            
+            ## Description
+            
+            ${{ github.event.inputs.description || 'No description provided.' }}
             
             ## Docker Images
             
@@ -126,9 +125,26 @@ jobs:
             ## Usage
             
             ```bash
+            # Pull the specific pre-release version
             docker pull ghcr.io/${{ github.repository_owner }}/app:${{ steps.next-iteration.outputs.NEXT_VERSION }}
+            
+            # Or pull the latest pre-release
+            docker pull ghcr.io/${{ github.repository_owner }}/app:latest-pre
+            
+            # Run the container
+            docker run -p 8080:8080 -e MODEL_SERVICE_URL=http://model-service:5000 ghcr.io/${{ github.repository_owner }}/app:${{ steps.next-iteration.outputs.NEXT_VERSION }}
             ```
             
-            ## Changes in this pre-release
+            ## Installation & Testing
             
-            _Please manually update this section with the changes included in this pre-release._
+            ```bash
+            # Clone and test locally
+            git checkout ${{ steps.next-iteration.outputs.NEXT_VERSION }}
+            pip install -r requirements.txt
+            python app.py
+            ```
+            
+            ---
+            
+            > **Note:** This is a pre-release version intended for testing purposes. 
+            > Please report any issues you encounter to help us improve the upcoming stable release. 
