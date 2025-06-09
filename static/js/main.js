@@ -39,8 +39,9 @@ document.addEventListener("DOMContentLoaded", function () {
     try {
       const response = await fetch("/info");
       const data = await response.json();
-      
-      if (data.model_service_status === "connected") {
+
+      const status = data.model_service_info?.status;
+      if (status === "healthy") {
         modelStatus.innerHTML = '<span class="icon">🟢</span><span>Connected</span>';
         modelStatus.classList.add("connected");
         modelStatus.classList.remove("disconnected");
@@ -50,6 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
         modelStatus.classList.remove("connected");
       }
     } catch (error) {
+      console.error("Error checking model status:", error);
       modelStatus.innerHTML = '<span class="icon">⚠️</span><span>Error</span>';
       modelStatus.classList.add("disconnected");
       modelStatus.classList.remove("connected");
