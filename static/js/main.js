@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const MAX_CHARS = 500;
   let currentToast = null;
+  let currentReviewData = null;
 
   // Character counter
   reviewText.addEventListener("input", function () {
@@ -128,6 +129,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const data = await response.json();
       
+      // Store current review data for feedback
+      currentReviewData = {
+        review: review,
+        prediction: data.sentiment === "positive" ? 1 : 0,
+        confidence: data.confidence
+      };
+      
       // Update UI with results
       resultsContainer.style.display = "block";
       
@@ -149,13 +157,47 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // Submit feedback function
+  function submitFeedback(isCorrect) {
+    if (!currentReviewData) {
+      showToast("warning", "No analysis results to provide feedback on");
+      return;
+    }
+
+    if (isCorrect) {
+      showToast("success", "Thank you for your feedback!");
+    } else {
+      const actualSentiment = currentReviewData.prediction === 1 ? 0 : 1;
+
+      fetch("/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          review: currentReviewData.review,
+          prediction: currentReviewData.prediction,
+          actual_sentiment: actualSentiment,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          showToast("success", "Thank you for your feedback! We will use it to improve our model.");
+        })
+        .catch((error) => {
+          console.error("Error submitting feedback:", error);
+          showToast("error", "An error occurred while submitting your feedback.");
+        });
+    }
+  }
+
   // Feedback handling
   correctBtn.addEventListener("click", function() {
-    showToast("success", "Thank you for your feedback!");
+    submitFeedback(true);
   });
 
   incorrectBtn.addEventListener("click", function() {
-    showToast("info", "Thank you for helping us improve!");
+    submitFeedback(false);
   });
 
   // Initial model service check
