@@ -5,8 +5,12 @@ on:
     tags:
       - "v*.*.*"
       - "!v*.*.*-pre*"
-
   workflow_dispatch:
+    inputs:
+      base_version:
+        description: 'Base version for pre-release (e.g., 1.2.3)'
+        required: true
+        type: string
 
 jobs:
   create-prerelease:
@@ -24,34 +28,79 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Calculate next pre-release version
-        id: next-version
+      - name: Determine base version
+        id: base-version
         run: |
-          CURRENT_TAG=${GITHUB_REF#refs/tags/}
-          echo "Current tag: $CURRENT_TAG"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger with specified version
+            BASE_VERSION="${{ github.event.inputs.base_version }}"
+            echo "Base version from input: $BASE_VERSION"
+          else
+            # Triggered by stable release tag
+            CURRENT_TAG=${GITHUB_REF#refs/tags/}
+            echo "Current tag: $CURRENT_TAG"
+            VERSION=${CURRENT_TAG#v}
+            
+            # Split into components and increment patch version
+            IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+            MAJOR="${VERSION_PARTS[0]}"
+            MINOR="${VERSION_PARTS[1]}"
+            PATCH="${VERSION_PARTS[2]}"
+            
+            NEXT_PATCH=$((PATCH + 1))
+            BASE_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
+            echo "Calculated base version: $BASE_VERSION"
+          fi
+          
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
 
-          VERSION=${CURRENT_TAG#v}
-
-          # Split into components
-          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
-          MAJOR="${VERSION_PARTS[0]}"
-          MINOR="${VERSION_PARTS[1]}"
-          PATCH="${VERSION_PARTS[2]}"
-
-          NEXT_PATCH=$((PATCH + 1))
-
-          # Here we generate timestamp to make pre-release unique
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-
-          # This will create pre-release version
-          NEXT_PRE_VERSION="v$MAJOR.$MINOR.$NEXT_PATCH-pre.$TIMESTAMP"
+      - name: Find next pre-release iteration
+        id: next-iteration
+        run: |
+          BASE_VERSION="${{ steps.base-version.outputs.BASE_VERSION }}"
+          echo "Looking for existing pre-release tags for version $BASE_VERSION"
+          
+          # Get all existing pre-release tags for this base version
+          EXISTING_TAGS=$(git tag -l "v$BASE_VERSION-pre-*" | sort -V)
+          echo "Existing pre-release tags:"
+          echo "$EXISTING_TAGS"
+          
+          # Find the highest iteration number
+          HIGHEST_ITERATION=0
+          if [ -n "$EXISTING_TAGS" ]; then
+            for tag in $EXISTING_TAGS; do
+              # Extract iteration number from tag (e.g., v1.2.3-pre-5 -> 5)
+              ITERATION=$(echo "$tag" | sed -n 's/.*-pre-\([0-9]*\)$/\1/p')
+              if [ -n "$ITERATION" ] && [ "$ITERATION" -gt "$HIGHEST_ITERATION" ]; then
+                HIGHEST_ITERATION=$ITERATION
+              fi
+            done
+          fi
+          
+          # Calculate next iteration
+          NEXT_ITERATION=$((HIGHEST_ITERATION + 1))
+          NEXT_PRE_VERSION="v$BASE_VERSION-pre-$NEXT_ITERATION"
+          
+          echo "Highest existing iteration: $HIGHEST_ITERATION"
+          echo "Next iteration: $NEXT_ITERATION"
           echo "Next pre-release version: $NEXT_PRE_VERSION"
-          echo "NEXT_VERSION=$NEXT_PRE_VERSION" >> $GITHUB_ENV
+          
+          echo "NEXT_VERSION=$NEXT_PRE_VERSION" >> $GITHUB_OUTPUT
+          echo "ITERATION_NUMBER=$NEXT_ITERATION" >> $GITHUB_OUTPUT
 
       - name: Create pre-release tag
         run: |
-          git tag -a $NEXT_VERSION -m "Automatic pre-release version after $CURRENT_TAG"
-          git push origin $NEXT_VERSION
+          NEXT_VERSION="${{ steps.next-iteration.outputs.NEXT_VERSION }}"
+          echo "Creating tag: $NEXT_VERSION"
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            COMMIT_MESSAGE="Manual pre-release $NEXT_VERSION"
+          else
+            COMMIT_MESSAGE="Automatic pre-release $NEXT_VERSION after ${{ github.ref_name }}"
+          fi
+          
+          git tag -a "$NEXT_VERSION" -m "$COMMIT_MESSAGE"
+          git push origin "$NEXT_VERSION"
 
       - name: Create GitHub Pre-Release
         uses: softprops/action-gh-release@v1
@@ -59,19 +108,27 @@ jobs:
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
           draft: false
           prerelease: true
-          tag_name: ${{ env.NEXT_VERSION }}
-          name: Pre-release ${{ env.NEXT_VERSION }}
+          tag_name: ${{ steps.next-iteration.outputs.NEXT_VERSION }}
+          name: Pre-release ${{ steps.next-iteration.outputs.NEXT_VERSION }}
           body: |
-            # Pre-release ${{ env.NEXT_VERSION }}
-
-            This is an automatic pre-release following the stable release ${{ github.ref_name }}.
-
+            # Pre-release ${{ steps.next-iteration.outputs.NEXT_VERSION }}
+            
+            ${{ github.event_name == 'workflow_dispatch' && 'This is a manual pre-release created via workflow dispatch.' || format('This is an automatic pre-release following the stable release {0}.', github.ref_name) }}
+            
+            **Base Version:** ${{ steps.base-version.outputs.BASE_VERSION }}  
+            **Iteration:** #${{ steps.next-iteration.outputs.ITERATION_NUMBER }}
+            
             ## Docker Images
-
-            - `ghcr.io/${{ github.repository }}:${{ env.NEXT_VERSION }}`
-
+            
+            - `ghcr.io/${{ github.repository_owner }}/app:${{ steps.next-iteration.outputs.NEXT_VERSION }}`
+            - `ghcr.io/${{ github.repository_owner }}/app:latest-pre`
+            
             ## Usage
-
+            
             ```bash
-            docker pull ghcr.io/${{ github.repository }}:${{ env.NEXT_VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/app:${{ steps.next-iteration.outputs.NEXT_VERSION }}
             ```
+            
+            ## Changes in this pre-release
+            
+            _Please manually update this section with the changes included in this pre-release._
